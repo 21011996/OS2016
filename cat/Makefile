@@ -1,6 +1,10 @@
-all:
-	LD_LIBRARY_PATH="../lib"
-	gcc cat.c -L../lib/ -Wl,-rpath=../lib -lhelpers -o cat
+all: cat
 
 clean:
-	rm cat
+	rm -f cat cat.o
+
+cat.o: cat.c
+	gcc $< -o $@ -c
+
+cat: cat.o
+	gcc $< -o $@

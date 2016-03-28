@@ -1,0 +1,2 @@
+/bin/dos2unix.exe *.sh
+bash *.sh

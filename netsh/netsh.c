@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include "bufio.h"
 #include "helpers.h"
 
@@ -80,7 +82,50 @@ int read_and_exec(int fdin, int fdout) {
     return 0;
 }
 
+void print_err(char *string) {
+    fprintf(stderr, "%s\n", string);
+    exit(EXIT_FAILURE);
+}
+
 int main(int argc, char *argv[]) {
+    /*if (argc != 2) {
+        print_err("Arguments failure");
+    }*/
+
+    pid_t main_pid = fork();
+    switch(main_pid) {
+        case 0:
+            break;
+        case -1:
+            print_err("Can't fork main");
+        default:
+            exit(0);
+    }
+
+    if(setsid()<0) {
+        print_err("Can't start new session");
+    }
+    pid_t nsession_pid = fork();
+    switch(nsession_pid) {
+        case 0:
+            break;
+        case -1:
+            print_err("Can't fork from deamon");
+        default:
+            return 0;
+    }
+
+    pid_t deamon_pid = getpid();
+    char netsh_pid_file[420];
+    mkdir("tmp", S_IRWXU | S_IRWXG | S_IRWXO);
+    snprintf(netsh_pid_file, sizeof(netsh_pid_file), "tmp/netsh.pid");
+    FILE* f = fopen(netsh_pid_file, "w");
+    if (f < 0) {
+        print_err("Can't create file");
+    }
+    fprintf(f,"%d", deamon_pid);
+    fclose(f);
+
     int code = read_and_exec(STDIN_FILENO, STDOUT_FILENO);
     return 0;
 }

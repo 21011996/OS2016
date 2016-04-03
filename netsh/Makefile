@@ -1,12 +1,9 @@
-CC=g++
+CC=gcc
 
-TASK=netsh
+all: netsh
 
-all: $(TASK)
-
-$(TASK):
-	$(CC) $(TASK).cpp -o $(TASK).o -c
-	$(CC) -s $(TASK).o -o $(TASK)
+netsh:
+	gcc -Wall netsh.c bufio.c helpers.c -o netsh
 
 clean:
 	rm -f *.o $(TASK)

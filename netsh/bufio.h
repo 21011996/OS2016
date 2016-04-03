@@ -5,7 +5,7 @@
 typedef int fd_t;
 
 struct buf_t {
-    char * data;
+    void * data;
     size_t capacity;
     size_t size;
 };

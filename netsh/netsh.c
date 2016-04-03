@@ -76,6 +76,7 @@ int read_and_exec(int fdin, int fdout) {
     }
     buf->size -= (buffer - (char*) buf->data + 1);
     runpiped(arguments, k);
+    buf_free(buf);
     return 0;
 }
 

@@ -25,68 +25,6 @@ void buf_free(struct buf_t * buf) {
     free(buf);
 }
 
-size_t buf_capacity(struct buf_t * buf) {
-
-    return buf->capacity;
-}
-
-size_t buf_size(struct buf_t * buf) {
-
-    return buf->size;
-}
-
-ssize_t buf_fill(fd_t fd, struct buf_t * buf, size_t required) {
-
-    size_t bread;
-
-    buf->size = 0;
-
-    do {
-        bread = read(fd, buf->data + buf->size, buf->capacity - buf->size);
-
-        if (bread == -1) {
-            return -1;
-        }
-
-        buf->size += bread;
-    } while (buf->size < required && bread > 0);
-
-    return buf->size;
-}
-
-ssize_t buf_flush(fd_t fd, struct buf_t * buf, size_t required) {
-
-    size_t bwritten = 0;
-    size_t twritten;
-    int error = 0;
-
-    if (required > buf->size) {
-        required = buf->size;
-    }
-
-    do {
-        twritten = write(fd, buf->data + bwritten, buf->size);
-
-        if (twritten == -1) {
-            error = 1;
-            break;
-        }
-
-        bwritten += twritten;
-        buf->size -= twritten;
-    } while (bwritten < required && twritten > 0);
-
-    memcpy(buf->data, buf->data + bwritten, buf->size);
-
-    if (error) {
-        return -1;
-    } else {
-        return buf->size;
-    }
-	
-
-}
-
 ssize_t delim_lookup(char* buffer, int len, char delim) {
     for (size_t i = 0; i < len; i++) {
         if (buffer[i] == 0)

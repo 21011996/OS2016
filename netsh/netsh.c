@@ -55,7 +55,7 @@ int get_delim(char* buffer, char delim) {
     return i;
 }
 
-int read_and_exec(int socket) {
+int read_and_exec(int socket, int out) {
     struct buf_t* buf = buf_new(8049);
     int pos = buf_readuntil(socket, buf, '\n');
     if (pos == -2)
@@ -84,7 +84,7 @@ int read_and_exec(int socket) {
         k++;
     }
     buf->size -= (buffer - (char*) buf->data + 1);
-    runpiped(arguments, k, socket);
+    runpiped(arguments, k, socket, out);
     buf_free(buf);
     return 0;
 }
@@ -93,17 +93,6 @@ void print_err(char *string) {
     fprintf(stderr, "%s\n", string);
     exit(EXIT_FAILURE);
 }
-
-struct addres_info {
-    int flag;
-    int family;
-    int socktype;
-    int protocol;
-    size_t addres_length;
-    struct sockaddr *address;
-    char canonical_name;
-    struct addres_info *next;
-};
 
 int create_and_bind(char *port) {
     struct addrinfo type;
@@ -301,7 +290,7 @@ int main(int argc, char *argv[]) {
                    and won't get a notification again for the same
                    data. */
                     //Read string and exec it
-                    int code = read_and_exec(events[i].data.fd);
+                    int code = read_and_exec(events[i].data.fd, STDOUT_FILENO);
                     if (code < 0) {
                         print_err("Can't execute line");
                     }

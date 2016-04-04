@@ -326,22 +326,20 @@ int main(int argc, char *argv[]) {
                         break;
                     }
 
-                    pid_t pipes_fork = fork();
-                    if (pipes_fork == -1) {
-                        print_err("Failed to fork on input received");
-                    } else if (pipes_fork > 0) {
-                        // Do nothing
-                    } else {
-                        //Read string and exec it
-                        int code = read_and_exec(events[i].data.fd);
-                        if (code < 0) {
-                            print_err("Can't execute line");
-                        }
+                    /* Write the buffer to standard output */
+                    int s = write (1, buf, count);
+                    if (s == -1)
+                    {
+                        perror ("write");
+                        abort ();
                     }
                 }
 
                 if (done)
                 {
+                    printf ("Closed connection on descriptor %d\n",
+                            events[i].data.fd);
+
                     /* Closing the descriptor will make epoll remove it
                        from the set of descriptors which are monitored. */
                     close (events[i].data.fd);

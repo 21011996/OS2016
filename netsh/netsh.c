@@ -1,11 +1,14 @@
-#include <stdio.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
-#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <netdb.h>
 #include "bufio.h"
 #include "helpers.h"
 
@@ -68,7 +71,8 @@ int read_and_exec(int socket) {
             break;
         char* argv[argc];
         int shift;
-        for (int i = 0; i < argc; i++) {
+        int i = 0;
+        for (i = 0; i < argc; i++) {
             delim = '|';
             argv[i] = get_word(buffer, &delim, &shift);
             buffer += shift;

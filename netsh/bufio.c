@@ -26,7 +26,8 @@ void buf_free(struct buf_t * buf) {
 }
 
 ssize_t delim_lookup(char* buffer, int len, char delim) {
-    for (size_t i = 0; i < len; i++) {
+    size_t i = 0;
+    for (i = 0; i < len; i++) {
         if (buffer[i] == 0)
             break; 
         if (buffer[i] == delim)

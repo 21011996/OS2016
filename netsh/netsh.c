@@ -339,9 +339,6 @@ int main(int argc, char *argv[]) {
 
                 if (1)
                 {
-                    printf ("Closed connection on descriptor %d\n",
-                            events[i].data.fd);
-
                     /* Closing the descriptor will make epoll remove it
                        from the set of descriptors which are monitored. */
                     close (events[i].data.fd);

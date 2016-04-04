@@ -281,7 +281,7 @@ int main(int argc, char *argv[]) {
                 }
                 continue;
             }
-            else// if (events[i].events & EPOLLIN)
+            else if (events[i].events & EPOLLIN)
             {
                 /* We have data on the fd waiting to be read. Read and
                    display it. We must read whatever data is available

@@ -219,7 +219,7 @@ int main(int argc, char *argv[]) {
     }
 
     //Setup epoll
-    int epoll_fd = epoll_create(0);
+    int epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
         print_err("Can't create epoll");
     }

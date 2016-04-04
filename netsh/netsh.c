@@ -301,16 +301,16 @@ int main(int argc, char *argv[]) {
                    data. */
                 int done = 0;
 
-                while (1)
+                /*while (1)
                 {
                     ssize_t count;
-                    char buf[512];
+                    char buf[4096];
 
                     count = read (events[i].data.fd, buf, sizeof buf);
                     if (count == -1)
                     {
-                        /* If errno == EAGAIN, that means we have read all
-                           data. So go back to the main loop. */
+                        // If errno == EAGAIN, that means we have read all
+                         //  data. So go back to the main loop.
                         if (errno != EAGAIN)
                         {
                             perror ("read");
@@ -320,22 +320,24 @@ int main(int argc, char *argv[]) {
                     }
                     else if (count == 0)
                     {
-                        /* End of file. The remote has closed the
-                           connection. */
+                        // End of file. The remote has closed the
+                           //connection.
                         done = 1;
                         break;
                     }
 
-                    /* Write the buffer to standard output */
+                    // Write the buffer to standard output
                     int s = write (events[i].data.fd, buf, count);
                     if (s == -1)
                     {
                         perror ("write");
                         abort ();
                     }
-                }
+                }*/
 
-                if (done)
+                read_and_exec(events[i].data.fd);
+
+                if (1)
                 {
                     printf ("Closed connection on descriptor %d\n",
                             events[i].data.fd);

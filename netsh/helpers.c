@@ -50,8 +50,6 @@ int runpiped(struct execargs_t** programs, size_t n, fd_t socket) {
 	for (i = 0; i < n - 1; i++)
         if (pipe2(pipefd[i], O_CLOEXEC) < 0)
             return -1;
-    pipefd[0][0] = socket;
-    pipefd[n-1][1] = socket;
     i = 0;
 	for (i = 0; i < n; i++) {
 		if (!(childpid[i] = fork())) {

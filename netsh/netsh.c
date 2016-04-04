@@ -247,7 +247,6 @@ int main(int argc, char *argv[]) {
                     struct sockaddr in_addr;
                     socklen_t in_len;
                     int infd;
-                    char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 
                     in_len = sizeof in_addr;
                     infd = accept (socket_fd, &in_addr, &in_len);
@@ -273,7 +272,7 @@ int main(int argc, char *argv[]) {
                         print_err("Can't unblock socket");
 
                     event.data.fd = infd;
-                    event.events = EPOLLIN | EPOLLET;
+                    event.events = EPOLLIN;
                     int epc_status = epoll_ctl (epoll_fd, EPOLL_CTL_ADD, infd, &event);
                     if (epc_status == -1)
                     {
@@ -334,7 +333,7 @@ int main(int argc, char *argv[]) {
                        from the set of descriptors which are monitored. */
                     close (events[i].data.fd);
                 }
-                    //Read string and exec it
+                   /* //Read string and exec it
                     int code = read_and_exec(events[i].data.fd, STDOUT_FILENO);
                     if (code < 0) {
                         print_err("Can't execute line");
@@ -346,7 +345,7 @@ int main(int argc, char *argv[]) {
                     if (epc_status == -1) {
                         print_err("Can't add epoll event");
                     }
-                    close(events[i].data.fd);
+                    close(events[i].data.fd);*/
             }
             else if (events[i].events & EPOLLOUT) {
                 event.data.fd = events[i].data.fd;

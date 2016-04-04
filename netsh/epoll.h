@@ -1,4 +1,4 @@
-/* Copyright (C) 2002 Free Software Foundation, Inc.
+/* Copyright (C) 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -24,7 +24,7 @@
 
 
 enum EPOLL_EVENTS
-  {
+{
     EPOLLIN = 0x001,
 #define EPOLLIN EPOLLIN
     EPOLLPRI = 0x002,
@@ -49,8 +49,7 @@ enum EPOLL_EVENTS
 #define EPOLLONESHOT EPOLLONESHOT
     EPOLLET = (1 << 31)
 #define EPOLLET EPOLLET
-
-  };
+};
 
 
 /* Valid opcodes ( "op" parameter ) to issue to epoll_ctl().  */
@@ -59,30 +58,19 @@ enum EPOLL_EVENTS
 #define EPOLL_CTL_MOD 3	/* Change file decriptor epoll_event structure.  */
 
 
-/*
- * On x86-64 make the 64bit structure have the same alignment as the
- * 32bit structure. This makes 32bit emulation easier.
- */
-#ifdef __x86_64__
-#define EPOLL_PACKED __attribute__((packed))
-#else
-#define EPOLL_PACKED
-#endif
-
-
 typedef union epoll_data
 {
-  void *ptr;
-  int fd;
-  uint32_t u32;
-  uint64_t u64;
+    void *ptr;
+    int fd;
+    uint32_t u32;
+    uint64_t u64;
 } epoll_data_t;
 
 struct epoll_event
 {
-  uint32_t events;	/* Epoll events */
-  epoll_data_t data;	/* User data variable */
-} EPOLL_PACKED;
+    uint32_t events;	/* Epoll events */
+    epoll_data_t data;	/* User data variable */
+};
 
 
 __BEGIN_DECLS
@@ -101,7 +89,7 @@ extern int epoll_create (int __size) __THROW;
    operation. The "event" parameter describes which events the caller
    is interested in and any associated user data.  */
 extern int epoll_ctl (int __epfd, int __op, int __fd,
-		      struct epoll_event *__event) __THROW;
+                      struct epoll_event *__event) __THROW;
 
 
 /* Wait for events on an epoll instance "epfd". Returns the number of
@@ -110,9 +98,12 @@ extern int epoll_ctl (int __epfd, int __op, int __fd,
    "events" parameter is a buffer that will contain triggered
    events. The "maxevents" is the maximum number of events to be
    returned ( usually size of "events" ). The "timeout" parameter
-   specifies the maximum wait time in milliseconds (-1 == infinite).  */
+   specifies the maximum wait time in milliseconds (-1 == infinite).
+
+   This function is a cancellation point and therefore not marked with
+   __THROW.  */
 extern int epoll_wait (int __epfd, struct epoll_event *__events,
-		       int __maxevents, int __timeout) __THROW;
+                       int __maxevents, int __timeout);
 
 __END_DECLS
 

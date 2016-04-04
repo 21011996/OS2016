@@ -241,7 +241,6 @@ int main(int argc, char *argv[]) {
         {
             if ((events[i].events & EPOLLERR) ||
                 (events[i].events & EPOLLHUP) ||
-                (!(events[i].events & EPOLLOUT)) ||
                 (!(events[i].events & EPOLLIN)))
             {
                 //print_err("Epoll error");
@@ -293,37 +292,58 @@ int main(int argc, char *argv[]) {
                 }
                 continue;
             }
-            else if (events[i].events & EPOLLIN)
+            else
             {
                 /* We have data on the fd waiting to be read. Read and
                    display it. We must read whatever data is available
                    completely, as we are running in edge-triggered mode
                    and won't get a notification again for the same
                    data. */
-                    //Read string and exec it
-                    int code = read_and_exec(events[i].data.fd);
-                    if (code < 0) {
-                        print_err("Can't execute line");
+                int done = 0;
+
+                while (1)
+                {
+                    ssize_t count;
+                    char buf[512];
+
+                    count = read (events[i].data.fd, buf, sizeof buf);
+                    if (count == -1)
+                    {
+                        /* If errno == EAGAIN, that means we have read all
+                           data. So go back to the main loop. */
+                        if (errno != EAGAIN)
+                        {
+                            perror ("read");
+                            done = 1;
+                        }
+                        break;
+                    }
+                    else if (count == 0)
+                    {
+                        /* End of file. The remote has closed the
+                           connection. */
+                        done = 1;
+                        break;
                     }
 
-                    event.data.fd = events[i].data.fd;
-                    event.events = EPOLLOUT;
-                    int epc_status = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, events[i].data.fd, &event);
-                    if (epc_status == -1) {
-                        print_err("Can't add epoll event");
+                    /* Write the buffer to standard output */
+                    int s = write (1, buf, count);
+                    if (s == -1)
+                    {
+                        perror ("write");
+                        abort ();
                     }
-                    close(events[i].data.fd);
-            }
-            else if (events[i].events & EPOLLOUT) {
-                event.data.fd = events[i].data.fd;
-                int epc_status = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[i].data.fd, &event);
-                if (epc_status == -1) {
-                    print_err("Can't modify status to DEL");
                 }
-                if (shutdown(events[i].data.fd, SHUT_RDWR) == -1) {
 
+                if (done)
+                {
+                    printf ("Closed connection on descriptor %d\n",
+                            events[i].data.fd);
+
+                    /* Closing the descriptor will make epoll remove it
+                       from the set of descriptors which are monitored. */
+                    close (events[i].data.fd);
                 }
-                close(events[i].data.fd);
             }
         }
     }

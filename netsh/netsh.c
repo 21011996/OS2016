@@ -347,7 +347,7 @@ int main(int argc, char *argv[]) {
                     }
                     close(events[i].data.fd);*/
             }
-            /*else if (events[i].events & EPOLLOUT) {
+            else if (events[i].events & EPOLLOUT) {
                 event.data.fd = events[i].data.fd;
                 int epc_status = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[i].data.fd, &event);
                 if (epc_status == -1) {
@@ -357,7 +357,7 @@ int main(int argc, char *argv[]) {
 
                 }
                 close(events[i].data.fd);
-            }*/
+            }
         }
     }
     return 0;

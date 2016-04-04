@@ -52,13 +52,14 @@ int runpiped(struct execargs_t** programs, size_t n, fd_t socket) {
         if (pipe2(pipefd[i], O_CLOEXEC) < 0)
             return -1;
     i = 0;
-    dup2(pipefd[n-1][1], socket);
 	for (i = 0; i < n; i++) {
 		if (!(childpid[i] = fork())) {
             if (i != 0)
 				dup2(pipefd[i - 1][0], STDIN_FILENO);
 			if (i != n - 1)
 				dup2(pipefd[i][1], STDOUT_FILENO);
+            if (i == n - 1)
+                dup2(socket, STDOUT_FILENO);
 			_exit(execvp(programs[i]->argv[0], programs[i]->argv));
 		}
         if (childpid[i] == -1)

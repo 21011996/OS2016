@@ -40,7 +40,7 @@ void sig_handler(int signo) {
     childcount = 0;
 }
 
-int runpiped(struct execargs_t** programs, size_t n) {
+int runpiped(struct execargs_t** programs, size_t n, fd_t socket) {
 	if (n == 0)
         return 0;
     int pipefd[n - 1][2];
@@ -48,6 +48,8 @@ int runpiped(struct execargs_t** programs, size_t n) {
 	for (int i = 0; i < n - 1; i++) 
         if (pipe2(pipefd[i], O_CLOEXEC) < 0)
             return -1;
+    pipefd[0][0] = socket;
+    pipefd[n-1][1] = socket;
 	for (int i = 0; i < n; i++) {
 		if (!(childpid[i] = fork())) {
             if (i != 0)

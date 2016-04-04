@@ -1,8 +1,11 @@
 #include <stdio.h>
-#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/socket.h>
+#include <sys/epoll.h>
+#include <netdb.h>
+#include <errno.h>
 #include "bufio.h"
 #include "helpers.h"
 
@@ -49,9 +52,9 @@ int get_delim(char* buffer, char delim) {
     return i;
 }
 
-int read_and_exec(int fdin, int fdout) {
+int read_and_exec(int socket) {
     struct buf_t* buf = buf_new(8049);
-    int pos = buf_readuntil(fdin, buf, '\n');
+    int pos = buf_readuntil(socket, buf, '\n');
     if (pos == -2)
         return 0;
     char* buffer = buf->data;
@@ -77,7 +80,7 @@ int read_and_exec(int fdin, int fdout) {
         k++;
     }
     buf->size -= (buffer - (char*) buf->data + 1);
-    runpiped(arguments, k);
+    runpiped(arguments, k, socket);
     buf_free(buf);
     return 0;
 }
@@ -87,10 +90,83 @@ void print_err(char *string) {
     exit(EXIT_FAILURE);
 }
 
+struct addres_info {
+    int flag;
+    int family;
+    int socktype;
+    int protocol;
+    size_t addres_length;
+    struct sockaddr *address;
+    char canonical_name;
+    struct addres_info *next;
+};
+
+int create_and_bind(char *port) {
+    struct addrinfo type;
+    struct addrinfo *result;
+
+    memset (&type, 0, sizeof (struct addrinfo));
+    type.ai_family = AF_INET;
+    type.ai_socktype = SOCK_STREAM;
+    type.ai_protocol = IPPROTO_TCP;
+
+
+    int gai_result = getaddrinfo (NULL, port, &type, &result);
+    if (gai_result == -1)
+    {
+       print_err("Can't get address info");
+    }
+
+    //bind
+    int socket_fd = 0;
+    struct addrinfo *i;
+    for (i = result; i != NULL; i = i->ai_next)
+    {
+        // Try to bind with every addr
+        socket_fd = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (socket_fd == -1)
+            continue;
+
+        int bind_status = bind (socket_fd, i->ai_addr, i->ai_addrlen);
+        if (bind_status == 0)
+        {
+            // Has been able to bind
+            break;
+        }
+
+        close (socket_fd);
+    }
+
+    if (i == NULL)
+    {
+        print_err("Could not bind");
+        return -1;
+    }
+
+    freeaddrinfo (result);
+
+    return socket_fd;
+}
+
+ int make_socket_non_blocking(int socket_fd) {
+     int flags = fcntl(socket_fd, F_GETFL, 0);
+     if (flags == -1) {
+         print_err("Can't get flags");
+     }
+
+     flags |= O_NONBLOCK;
+     int status = fcntl(socket_fd, F_SETFL, flags);
+     if (status == -1) {
+         print_err("Can't set non blocking flag");
+     }
+
+     return 0;
+}
+
 int main(int argc, char *argv[]) {
-    /*if (argc != 2) {
+    if (argc != 2) {
         print_err("Arguments failure");
-    }*/
+    }
 
     pid_t main_pid = fork();
     switch(main_pid) {
@@ -125,7 +201,155 @@ int main(int argc, char *argv[]) {
     }
     fprintf(f,"%d", deamon_pid);
     fclose(f);
+    //Done pre part
 
-    int code = read_and_exec(STDIN_FILENO, STDOUT_FILENO);
+    const int epoll_size = 32;
+    struct epoll_event event;
+    struct epoll_event *events;
+
+    //prepare socket
+    int socket_fd = create_and_bind(argv[1]);
+    make_socket_non_blocking(socket_fd);
+    if (listen(socket_fd, SOMAXCONN) == -1) {
+        print_err("Can't setup listener");
+    }
+
+    //Setup epoll
+    int epoll_fd = epoll_create1(0);
+    if (epoll_fd == -1) {
+        print_err("Can't create epoll");
+    }
+    event.data.fd = socket_fd;
+    event.events = EPOLLIN | EPOLLET;
+    int ectl_status = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, socket_fd, &event);
+    if (ectl_status == -1) {
+        print_err("Can't register fd in epoll");
+    }
+
+    events = calloc(epoll_size, sizeof(event));
+
+    while (1) // next code is from open source example
+    {
+        int n, i;
+
+        n = epoll_wait (epoll_fd, events, epoll_size, -1);
+        for (i = 0; i < n; i++)
+        {
+            if ((events[i].events & EPOLLERR) ||
+                (events[i].events & EPOLLHUP) ||
+                (!(events[i].events & EPOLLOUT)) ||
+                (!(events[i].events & EPOLLIN)))
+            {
+                print_err("Epoll error");
+                close (events[i].data.fd);
+                continue;
+            }
+
+            else if (socket_fd == events[i].data.fd)
+            {
+                /* We have a notification on the listening socket, which
+                   means one or more incoming connections. */
+                while (1)
+                {
+                    struct sockaddr in_addr;
+                    socklen_t in_len;
+                    int infd;
+                    char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+
+                    in_len = sizeof in_addr;
+                    infd = accept (socket_fd, &in_addr, &in_len);
+                    if (infd == -1)
+                    {
+                        if ((errno == EAGAIN) ||
+                            (errno == EWOULDBLOCK))
+                        {
+                            /* We have processed all incoming
+                               connections. */
+                            break;
+                        }
+                        else
+                        {
+                            perror ("Can't accept");
+                            break;
+                        }
+                    }
+                    /* Make the incoming socket non-blocking and add it to the
+                       list of fds to monitor. */
+                    int unblock_status = make_socket_non_blocking (infd);
+                    if (unblock_status == -1)
+                        print_err("Can't unblock socket");
+
+                    event.data.fd = infd;
+                    event.events = EPOLLIN | EPOLLET;
+                    int epc_status = epoll_ctl (epoll_fd, EPOLL_CTL_ADD, infd, &event);
+                    if (epc_status == -1)
+                    {
+                        print_err("Can't add flags");
+                    }
+                }
+                continue;
+            }
+            else if (events[i].events & EPOLLIN)
+            {
+                /* We have data on the fd waiting to be read. Read and
+                   display it. We must read whatever data is available
+                   completely, as we are running in edge-triggered mode
+                   and won't get a notification again for the same
+                   data. */
+                int done = 0;
+
+                while (1)
+                {
+                    ssize_t count;
+                    char buf[512];
+
+                    count = read (events[i].data.fd, buf, sizeof buf);
+                    if (count == -1)
+                    {
+                        /* If errno == EAGAIN, that means we have read all
+                           data. So go back to the main loop. */
+                        if (errno != EAGAIN)
+                        {
+                            perror ("read");
+                            done = 1;
+                        }
+                        break;
+                    }
+                    else if (count == 0)
+                    {
+                        /* End of file. The remote has closed the
+                           connection. */
+                        done = 1;
+                        break;
+                    }
+
+                    //Read string and exec it
+                    int code = read_and_exec(events[i].data.fd);
+                    if (code < 0) {
+                        print_err("Can't execute line");
+                    }
+                    event.data.fd = events[i].data.fd;
+                    event.events = EPOLLOUT;
+                    int epc_status = epoll_ctl(epoll_fd, EPOLL_CTL_MOD, events[i].data.fd, &event);
+                    if (epc_status == -1) {
+                        print_err("Can't modify status to OUT");
+                    }
+
+
+                }
+            }
+            else if (events[i].events & EPOLLOUT) {
+                event.data.fd = events[i].data.fd;
+                int epc_status = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[i].data.fd, &event);
+                if (epc_status == -1) {
+                    print_err("Can't modify status to DEL");
+                }
+                if (shutdown(events[i].data.fd, SHUT_RDWR) == -1) {
+
+                }
+                close(events[i].data.fd);
+            }
+        }
+    }
     return 0;
 }

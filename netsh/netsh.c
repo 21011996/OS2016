@@ -241,7 +241,6 @@ int main(int argc, char *argv[]) {
         {
             if ((events[i].events & EPOLLERR) ||
                 (events[i].events & EPOLLHUP) ||
-                (!(events[i].events & EPOLLOUT)) ||
                 (!(events[i].events & EPOLLIN)))
             {
                 //print_err("Epoll error");
@@ -293,7 +292,7 @@ int main(int argc, char *argv[]) {
                 }
                 continue;
             }
-            else if (events[i].events & EPOLLIN)
+            else
             {
                 /* We have data on the fd waiting to be read. Read and
                    display it. We must read whatever data is available
@@ -327,31 +326,26 @@ int main(int argc, char *argv[]) {
                         break;
                     }
 
-                    //Read string and exec it
-                    int code = read_and_exec(events[i].data.fd);
-                    if (code < 0) {
-                        print_err("Can't execute line");
+                    pid_t pipes_fork = fork();
+                    if (pipes_fork == -1) {
+                        print_err("Failed to fork on input received");
+                    } else if (pipes_fork > 0) {
+                        // Do nothing
+                    } else {
+                        //Read string and exec it
+                        int code = read_and_exec(events[i].data.fd);
+                        if (code < 0) {
+                            print_err("Can't execute line");
+                        }
                     }
-                    event.data.fd = events[i].data.fd;
-                    event.events = EPOLLOUT;
-                    int epc_status = epoll_ctl(epoll_fd, EPOLL_CTL_MOD, events[i].data.fd, &event);
-                    if (epc_status == -1) {
-                        print_err("Can't modify status to OUT");
-                    }
-
-
                 }
-            }
-            else if (events[i].events & EPOLLOUT) {
-                event.data.fd = events[i].data.fd;
-                int epc_status = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[i].data.fd, &event);
-                if (epc_status == -1) {
-                    print_err("Can't modify status to DEL");
-                }
-                if (shutdown(events[i].data.fd, SHUT_RDWR) == -1) {
 
+                if (done)
+                {
+                    /* Closing the descriptor will make epoll remove it
+                       from the set of descriptors which are monitored. */
+                    close (events[i].data.fd);
                 }
-                close(events[i].data.fd);
             }
         }
     }

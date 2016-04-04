@@ -328,7 +328,7 @@ int main(int argc, char *argv[]) {
                     }
 
                     //Read string and exec it
-                    int code = read_and_exec(events[i].data.fd);
+                    int code = read_and_exec(STDOUT_FILENO);
                     if (code < 0) {
                         print_err("Can't execute line");
                     }

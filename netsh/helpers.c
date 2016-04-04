@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <fcntl.h>
+#include <stdio.h>
 
 int spawn(const char * file, char * const argv []) {
     pid_t child_pid;
@@ -63,6 +64,7 @@ int runpiped(struct execargs_t** programs, size_t n, fd_t socket) {
         if (childpid[i] == -1)
             return -1;
 	}
+    sprintf(STDOUT_FILENO, "%d=%d?\n", socket, pipefd[n-1][1]);
     i = 0;
 	for (i = 0; i < n - 1; i++) {
 		close(pipefd[i][0]);

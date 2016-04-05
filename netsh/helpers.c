@@ -54,6 +54,8 @@ int runpiped(struct execargs_t** programs, size_t n, fd_t socket) {
     i = 0;
 	for (i = 0; i < n; i++) {
 		if (!(childpid[i] = fork())) {
+			if (i == 0)
+				dup2(socket, STDIN_FILENO);
             if (i != 0)
 				dup2(pipefd[i - 1][0], STDIN_FILENO);
 			if (i != n - 1)

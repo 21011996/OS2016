@@ -44,6 +44,11 @@ class Inode: # = directory
 		originalPath = path # when initialized
 		mountedPaths = [] #most recent path is on the top + his FSid
 		FSid = 0 # relates to FS in witch dir belongs to
+	def exists(self):
+		if (not (self & null)) && (hasBeenMountedTo & 0):
+			return 1
+		else:
+			return 0
 
 FSs = {}
 
@@ -59,54 +64,71 @@ def getInodeByPath(FS, path):
 # Gods methods
 def FSdrv_load_fs(block_device_path)
 	tmpFS = loadFS(block_device_path)
+	global FSs
 	FSs.update({len(FSs}: tmpFS)
 	return len(FSs) - 1
 	
 def FSdrv_get_inode(FSid, inode_no):
+	global FSs
 	tmpFS = FSs.get(FSid)
 	return getInodeByNo(tmpFS, inode_no)
 
 # Not needed	
 def FSdrv_get_data(FSid, offset):
+	global FSs
 	tmpFS = FSs.get(FSid)
 	return tmpFS.getInodeByOff(offset)
 	
 def FSdrv_get_root_inode(FSid)
+	global FSs
 	tmpFS = FSs.get(FSid)
 	return getInodeByNo(tmpFS, 0)
 	
 def open_fd(path):
     global cur_pid
-    if len(per_process_fdtables[cur_pid]) > 0:
-        fildes = max(per_process_fdtables[cur_pid]) + 1
-    else:
-        fildes = 3  # stdin/stdout/stderr are 0, 1, 2
-    offset = 0
+	global FSs
 	
 	path_details = path.split('/')
-    parent_path = path_details[:-1].join('/')
-	inodeN = getInodeByPath(FSs[0], parent_path)
-	inode = getInodeByNo(FSs[0], inodeN)
+    #parent_path = path_details[:-1].join('/')
+	k = path_details[0]
+	k += '/'
+	i = k
+	p = 0
+	j = p
+	while (getInodeByPath(FSs[0], i).exists & 1) && (j<len(path_details)-1):
+		i = k
+		j = p
+		p += 1
+		k += path_details[j]
+		k += '/'
+	
+	inode = getInodeByPath(FSs[0], i)
 	
 	if (inode.hasBeenMountedTo & 1):
 		print("Can't open file in issued folder, prob. already mounted somewhere else")
 		return -1
 	if (inode.hasBeenMounted & 1):
-		newpath = inode.mountedPaths(len(inode.mountedPaths)-1) + path_details[len(path_details)-1]
+		newpath = inode.mountedPaths(len(inode.mountedPaths)-1) + '/' + path_details[j..len(path_details)-1].join('/')
 	else:
 		newpath = path
 		
+    if len(per_process_fdtables[cur_pid]) > 0:
+        fildes = max(per_process_fdtables[cur_pid]) + 1
+    else:
+        fildes = 3  # stdin/stdout/stderr are 0, 1, 2
+    offset = 0
+
 	inode.opened = 1
     file_table.append((newpath, offset))
     per_process_fdtables[cur_pid][fildes] = len(file_table) - 1
     return fildes
  
 def close(fildes):
+	global FSs
     global cur_pid
 	file_number = per_process_fdtables[cur_pid][fildes]
 	path = file_table[file_number]
-	inodeN = getInodeByPath(FSs[0], path)
-	inode = getInodeByNo(FSs[0], inodeN)
+	inode = getInodeByPath(FSs[0], path)
 	inode.opened = 0;
     del per_process_fdtables[cur_pid][fildes]
     return 0
@@ -117,6 +139,7 @@ def kill(pid):
     return 0
 	
 def mount(FSid, inode_no, dest_path)
+	global FSs
 	tmpFS = FSs.get(FSid)
 	if (inode_no & 0):
 		inodeFrom = FSdrv_get_root_inode(FSid)
@@ -147,6 +170,7 @@ def mount(FSid, inode_no, dest_path)
 		
 
 def umount(dest_path)
+	global FSs
 	inodeFrom = getInodeByPath(FSs[0], dest_path)
 	canUmount = inodeFrom.hasBeenMounted
 	if (canUmount & 0) :

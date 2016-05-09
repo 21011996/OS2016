@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
 
     events = calloc(epoll_size, sizeof(event));
 
-    while (1) // next code is from open source example
+    while (1)
     {
         int n, i;
 
@@ -243,15 +243,12 @@ int main(int argc, char *argv[]) {
                 (events[i].events & EPOLLHUP) ||
                 (!(events[i].events & EPOLLIN)))
             {
-                //print_err("Epoll error");
                 close (events[i].data.fd);
                 continue;
             }
 
             else if (socket_fd == events[i].data.fd)
             {
-                /* We have a notification on the listening socket, which
-                   means one or more incoming connections. */
                 while (1)
                 {
                     struct sockaddr in_addr;
@@ -266,8 +263,6 @@ int main(int argc, char *argv[]) {
                         if ((errno == EAGAIN) ||
                             (errno == EWOULDBLOCK))
                         {
-                            /* We have processed all incoming
-                               connections. */
                             break;
                         }
                         else
@@ -276,8 +271,6 @@ int main(int argc, char *argv[]) {
                             break;
                         }
                     }
-                    /* Make the incoming socket non-blocking and add it to the
-                       list of fds to monitor. */
                     int unblock_status = make_socket_non_blocking (infd);
                     if (unblock_status == -1)
                         print_err("Can't unblock socket");
@@ -294,53 +287,11 @@ int main(int argc, char *argv[]) {
             }
             else if (events[i].events == EPOLLIN)
             {
-                /* We have data on the fd waiting to be read. Read and
-                   display it. We must read whatever data is available
-                   completely, as we are running in edge-triggered mode
-                   and won't get a notification again for the same
-                   data. */
                 int done = 0;
-
-                /*while (1)
-                {
-                    ssize_t count;
-                    char buf[4096];
-
-                    count = read (events[i].data.fd, buf, sizeof buf);
-                    if (count == -1)
-                    {
-                        // If errno == EAGAIN, that means we have read all
-                         //  data. So go back to the main loop.
-                        if (errno != EAGAIN)
-                        {
-                            perror ("read");
-                            done = 1;
-                        }
-                        break;
-                    }
-                    else if (count == 0)
-                    {
-                        // End of file. The remote has closed the
-                           //connection.
-                        done = 1;
-                        break;
-                    }
-
-                    // Write the buffer to standard output
-                    int s = write (events[i].data.fd, buf, count);
-                    if (s == -1)
-                    {
-                        perror ("write");
-                        abort ();
-                    }
-                }*/
-
                 read_and_exec(events[i].data.fd);
 
                 if (1)
                 {
-                    /* Closing the descriptor will make epoll remove it
-                       from the set of descriptors which are monitored. */
                     close (events[i].data.fd);
                 }
             } else if (events[i].events == EPOLLOUT) {

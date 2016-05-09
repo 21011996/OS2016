@@ -35,10 +35,10 @@ struct execargs_t new_args(int argc, char** argv)
 int childcount;
 int* childarray;
 
-void sig_handler(int signo) {
+void sig_handler(int signum, siginfo_t *siginfo, void *context) {
     int i = 0;
     for (i = 0; i < childcount; i++)
-        kill(childarray[i], SIGKILL);
+        kill(childarray[i], SIGINT);
     childcount = 0;
 }
 
@@ -54,14 +54,10 @@ int runpiped(struct execargs_t** programs, size_t n, fd_t socket) {
     i = 0;
 	for (i = 0; i < n; i++) {
 		if (!(childpid[i] = fork())) {
-			if (i == 0)
-				dup2(socket, STDIN_FILENO);
             if (i != 0)
 				dup2(pipefd[i - 1][0], STDIN_FILENO);
 			if (i != n - 1)
 				dup2(pipefd[i][1], STDOUT_FILENO);
-            if (i == n - 1)
-                dup2(socket, STDOUT_FILENO);
 			_exit(execvp(programs[i]->argv[0], programs[i]->argv));
 		}
         if (childpid[i] == -1)
@@ -76,12 +72,13 @@ int runpiped(struct execargs_t** programs, size_t n, fd_t socket) {
     childcount = n;
     childarray = (int*) childpid;
 	
-    struct sigaction act; //totally not copy pasted from net(
-    memset(&act, '\0', sizeof(act));
-    act.sa_handler = &sig_handler;
-   
-    if (sigaction(SIGINT, &act, NULL) < 0) 
-        return -1;
+	struct sigaction action1;
+	action1.sa_sigaction = sig_handler;
+	action1.sa_flags = SA_SIGINFO;
+	if (sigaction(SIGINT, &action1, NULL)) {
+		perror("Can't setup action");
+		return 1;
+	}
 
 	int status;
     i = 0;

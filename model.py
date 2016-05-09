@@ -15,7 +15,7 @@ cur_pid = -1
 
 process_list = []
 
-per_process_fdtables = [dict()]
+per_process_fdtables = []
 
 '''
 FS (File System) contains 
@@ -27,6 +27,7 @@ FS (File System) contains
 	file_table = []
 All FS are contained in FSs
 '''
+
 class FS:
 	def __init__(self, path):
 		fd = getRootFD(path);
@@ -95,14 +96,14 @@ def open_fd(path):
 	i = k
 	p = 0
 	j = p
-	while (getInodeByPath(FSs[0], i).exists & 1) && (j<len(path_details)-1):
+	while (getInodeByPath(FSs.get(0), i).exists & 1) && (j<len(path_details)-1):
 		i = k
 		j = p
 		p += 1
 		k += path_details[j]
 		k += '/'
 	
-	inode = getInodeByPath(FSs[0], i)
+	inode = getInodeByPath(FSs.get(0), i)
 	
 	if (inode.hasBeenMountedTo & 1):
 		print("Can't open file in issued folder, prob. already mounted somewhere else")
@@ -128,7 +129,7 @@ def close(fildes):
     global cur_pid
 	file_number = per_process_fdtables[cur_pid][fildes]
 	path = file_table[file_number]
-	inode = getInodeByPath(FSs[0], path)
+	inode = getInodeByPath(FSs.get(0), path)
 	inode.opened = 0;
     del per_process_fdtables[cur_pid][fildes]
     return 0
@@ -145,7 +146,7 @@ def mount(FSid, inode_no, dest_path)
 		inodeFrom = FSdrv_get_root_inode(FSid)
 	else:
 		inodeFrom = getInodeByNo(tmpFS, inode_no)
-	inodeTo = getInodeByPath(FSs[0], dest_path)
+	inodeTo = getInodeByPath(FSs.get(0), dest_path)
 	
 	isOkToMount1 = inodeFrom.hasBeenMountedTo
 	isOkToMount2 = inodeTo.hasBeenMountedTo
@@ -171,7 +172,7 @@ def mount(FSid, inode_no, dest_path)
 
 def umount(dest_path)
 	global FSs
-	inodeFrom = getInodeByPath(FSs[0], dest_path)
+	inodeFrom = getInodeByPath(FSs.get(0), dest_path)
 	canUmount = inodeFrom.hasBeenMounted
 	if (canUmount & 0) :
 		print("Nothing to unmount there")

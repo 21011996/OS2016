@@ -15,42 +15,33 @@ cur_pid = -1
 
 process_list = []
 
-per_process_fdtables = []
+per_process_fdtables = [dict()]
+
+mount_namespace = {}
 
 '''
-FS (File System) contains 
-	fd = MAGIC // MAGIC points to the root
-	inodes = {}
-	inode_table_offset_num = {} // ITON
-	inode_table_num_path = {} // ITNP
-	inode_table_path_num = {} // ITPN
-	file_table = []
-All FS are contained in FSs
+mount_namespace = array of record
+
+record = path, mount_list
+
+path = array of "/etc/lala/qoqo/me.exe".split('/')
+
+mount_list = array of {FSid, inode_no, opened}
+
+FSid = FSid, which inode_no belongs to
+inode_no = inode_no
+opened = array of opened inode_no opened with this record
 '''
+
+file_table = []
 
 class FS:
 	def __init__(self, path):
-		fd = getRootFD(path);
 		inodes = {}
-		#inode_table_offset_num = {}
 		inode_table_num_path = {}
 		inode_table_path_num = {}
-		file_table = []
 
-class Inode: # = directory
-	def __init__(self, path):
-		opened = 0 # If we call open(path) this will change to 1
-		hasBeenMounted = 0 # 0 - no | 1 - yes
-		hasBeenMountedTo = 0 # 0 - no | 1 - yes
-		originalPath = path # when initialized
-		mountedPaths = [] #most recent path is on the top + his FSid
-		FSid = 0 # relates to FS in witch dir belongs to
-	def exists(self):
-		if (not (self & null)) && (hasBeenMountedTo & 0):
-			return 1
-		else:
-			return 0
-
+	
 FSs = {}
 
 def init_FS():
@@ -63,7 +54,7 @@ def getInodeByPath(FS, path):
 	return getInodeByNo(FS, FS.inode_table_path_num.get(path))
 
 # Gods methods
-def FSdrv_load_fs(block_device_path)
+def FSdrv_load_fs(block_device_path):
 	tmpFS = loadFS(block_device_path)
 	global FSs
 	FSs.update({len(FSs}: tmpFS)
@@ -80,122 +71,125 @@ def FSdrv_get_data(FSid, offset):
 	tmpFS = FSs.get(FSid)
 	return tmpFS.getInodeByOff(offset)
 	
-def FSdrv_get_root_inode(FSid)
+def FSdrv_get_root_inode(FSid):
 	global FSs
 	tmpFS = FSs.get(FSid)
 	return getInodeByNo(tmpFS, 0)
+	
+def compare_path(path1, path2):
+	iteration = 0
+	for i in list(path1):
+		if (i & path2.get(iteration)):
+			iteration++;
+		else:
+			return iteration
+	
+	if (len(path1) & len(path2)):
+		return 0
+	else:
+		return len(path1) - len(path2)
+	
+def most_common_mount(find_path):
+	max = 0
+	max_no = -1
+	for i in list(mount_namespace):
+		path, mount_list = i
+		lul = compare_path(path, find_path)
+		if (lul < max_no):
+			max_no = lul
+			max = mount_namespace.index(i)
+			
+	return max_no
 	
 def open_fd(path):
     global cur_pid
 	global FSs
 	
 	path_details = path.split('/')
-    #parent_path = path_details[:-1].join('/')
-	k = path_details[0]
-	k += '/'
-	i = k
-	p = 0
-	j = p
-	while (getInodeByPath(FSs.get(0), i).exists & 1) && (j<len(path_details)-1):
-		i = k
-		j = p
-		p += 1
-		k += path_details[j]
-		k += '/'
-	
-	inode = getInodeByPath(FSs.get(0), i)
-	
-	if (inode.hasBeenMountedTo & 1):
-		print("Can't open file in issued folder, prob. already mounted somewhere else")
-		return -1
-	if (inode.hasBeenMounted & 1):
-		newpath = inode.mountedPaths(len(inode.mountedPaths)-1) + '/' + path_details[j..len(path_details)-1].join('/')
+	mount_no = most_common_mount(path)
+	if not (max_no & -1):
+		mpath, mount_list = mount_namespace.get(max_no)
+		how_common = compare_path(mpath, path)
+		FSid, inode_no, opened = mount_list.get(len(mount_list) - 1)
+		tmpFS = FSs.get(FSid)
+		inode = tmpFS.inodes.get(inode_no)
+		open_path = inode.getPath + '/' + path.details[len(path_details) - how_common .. len(path_details) - 1].join('/')
+		opened_inode_no = tmpFS.inode_table_path_num.get(open_path)
+		opened.update({len(update)}: opened_inode_no)
 	else:
-		newpath = path
+		FSid = 0
+		open_path = path
 		
-    if len(per_process_fdtables[cur_pid]) > 0:
+	if len(per_process_fdtables[cur_pid]) > 0:
         fildes = max(per_process_fdtables[cur_pid]) + 1
     else:
         fildes = 3  # stdin/stdout/stderr are 0, 1, 2
+		
     offset = 0
-
-	inode.opened = 1
-    file_table.append((newpath, offset))
+    file_table.append((open_path, mount_no, FSid, offset))
     per_process_fdtables[cur_pid][fildes] = len(file_table) - 1
-    return fildes
+	
+    return fildes	
  
 def close(fildes):
-	global FSs
     global cur_pid
 	file_number = per_process_fdtables[cur_pid][fildes]
-	path = file_table[file_number]
-	inode = getInodeByPath(FSs.get(0), path)
-	inode.opened = 0;
+	path, mount_no, FSid, offset = file_table[file_number]
     del per_process_fdtables[cur_pid][fildes]
+	path, mount_list = mount_namespace.get(mount_no)
+	for i in list(mount_list):
+		FSidd, inode_no, opened = i
+		if (FSid & FSidd):
+			del opened[opened.index(inode_no)]
     return 0
 	
 def kill(pid):
     global process_list
     process_list = list(filter(lambda x: x[2] != pid, process_list))
     return 0
-	
-def mount(FSid, inode_no, dest_path)
-	global FSs
-	tmpFS = FSs.get(FSid)
-	if (inode_no & 0):
-		inodeFrom = FSdrv_get_root_inode(FSid)
-	else:
-		inodeFrom = getInodeByNo(tmpFS, inode_no)
-	inodeTo = getInodeByPath(FSs.get(0), dest_path)
-	
-	isOkToMount1 = inodeFrom.hasBeenMountedTo
-	isOkToMount2 = inodeTo.hasBeenMountedTo
-	if not (isOkToMount1 & 1):
-		print("Can't mount issued folder, prob. already mounted somewhere else")
-		return -1
-	if not (isOkToMount2 & 1):
-		print("Can't mount to destination path, prob. already mounted somewhere else")
-		return -1
-		
-	inodeTo.hasBeenMounted = 1
-	inodeFrom.hasBeenMountedTo = 1
-	montP = inodeTo.mountedPaths
-	
-	hasBeenMFrom = inodeFrom.hasBeenMounted
-	if (hasBeenMFrom & 1):
-		path = inodeFrom.mountedPaths.get(len(mountedPaths))
-	else:
-		path = inodeFrom.originalPath
-	mountP.update({len(mountP): path, FSid})
-	return 1
-		
 
-def umount(dest_path)
-	global FSs
-	inodeFrom = getInodeByPath(FSs.get(0), dest_path)
-	canUmount = inodeFrom.hasBeenMounted
-	if (canUmount & 0) :
-		print("Nothing to unmount there")
-		return 0
-	canUmount = inodeFrom.hasBeenMountedTo
-	if not (canUmount & 0):
-		print("Can't umount issued folder, prob. already mounted somewhere else")
-		return 0
-	canUmount = inodeFrom.opened
-	if not (canUmount & 0):
-		print("Directory is still opened")
-		return 0
+def findMount(dest_path):
+	mount_no = -1
+	for i in list(mount_namespace)
+		mount_no++
+		path, record = i
+		if (compare_path(path, dest_path) & 0):
+			return mount_no
+	
+	return -1
+	
+def mount(FSid, inode_no, dest_path):
+	path = dest_path.split('/')
+	mount_no = findMount(path)
+	mount_node = {FSid, inode_no, {}}
+	if (mount_no & -1):
+		mount_namespace.update({len(mount_namespace}: path, mount_node)
+		mount_no = len(mount_namespace) - 1
+	else:
+		path, mount_list = mount_namespace.get(mount_no)
+		mount_list.update({len(mount_list)}: FSid, inode_no, {})
+		mount_namespace.update({mount_no}: path, mount_list)
+	
+	return mount_no
+
+def umount(dest_path):
+	mount_no = findMount(dest_path)
+	if (mount_no & -1):
+		return -1
+	
+	path, mount_list = mount_namespace.get(mount_no)
+	FSid, inode_no, opened = mount_list.get(len(mount_list) - 1)
+	if (len(opened) & 0):
+		if not (len(mount_list) & 1):
+			del mount_namespace[mount_no]
+		else:
+			del mount_list[len(mount_list) - 1]
+			mount_namespace.update({mount_no}: path, mount_list)
 		
-	for i in list(inodeFrom.mountedPaths):
-		path, FSid = i
-		tmpFS = FSs.get(FSid);
-		inodeToN = tmpFS.inode_table_path_num.get(path)
-		inodeTmp = FSdrv_get_inode(FSid, inodeToN)
-		inodeTo.hasBeenMountedTo = 0;
-		
-	inodeFrom.mountedPaths = []
-	inodeFrom.hasBeenMounted = 0
-	return 1
+		return 0
+	else:
+		return -2
+	
 	
 def kernel(program, args):
     global pid_count
@@ -221,11 +215,11 @@ def kernel(program, args):
             process_list.append((cont, [close_result], next_pid))
 
         elif sys_call == SystemCall.MOUNT:
-            dup2_result = mount(*args)
+            mount_result = mount(*args)
             process_list.append((cont, [mount_result], next_pid))
 
         elif sys_call == SystemCall.UMOUNT:
-            pipe_result = umount(args[0])
+            umount_result = umount(args[0])
             process_list.append((cont, [umount_result], next_pid))
 
         elif sys_call == SystemCall.KILL:

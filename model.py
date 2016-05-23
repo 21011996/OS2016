@@ -191,6 +191,7 @@ def umount(dest_path):
 def kernel(program, args):
     global pid_count
     global cur_pid
+	global FSs
     pid_count += 1
     pid = pid_count
     per_process_fdtables.append(dict())
@@ -227,7 +228,7 @@ def kernel(program, args):
             pid_count += 1
             process_list.append((cont, [cur_pid], cur_pid))
             process_list.append((cont, [0], pid_count))
-            per_process_fdtables.append(dict())  # imagine that we put stdin/stdout/stderr abstractions here
+            per_process_fdtables.append(dict())
 
         elif sys_call == SystemCall.EXIT:
             for fildes in list(per_process_fdtables[cur_pid].keys()):

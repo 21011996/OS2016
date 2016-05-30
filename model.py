@@ -17,7 +17,7 @@ process_list = []
 
 per_process_fdtables = [dict()]
 
-mount_namespace = {}
+per_process_mount_namespace = [dict()]
 
 '''
 mount_namespace = array of record
@@ -89,14 +89,15 @@ def compare_path(path1, path2):
 		return len(path1) - len(path2)
 	
 def most_common_mount(find_path):
+	global cur_pid
 	max = 0
 	max_no = -1
-	for i in list(mount_namespace):
+	for i in list(mount_namespace[cur_pid]):
 		path, mount_list = i
 		lul = compare_path(path, find_path)
 		if (lul < max_no):
 			max_no = lul
-			max = mount_namespace.index(i)
+			max = mount_namespace[cur_pid].index(i)
 			
 	return max_no
 	
@@ -106,18 +107,35 @@ def open_fd(path):
 	
 	path_details = path.split('/')
 	mount_no = most_common_mount(path)
-	if not (max_no & -1):
-		mpath, mount_list = mount_namespace.get(max_no)
+	if not (mount_no & -1):
+		mpath, mount_list = mount_namespace[cur_pid].get(mount_no)
 		how_common = compare_path(mpath, path)
 		FSid, inode_no, opened = mount_list.get(len(mount_list) - 1)
 		tmpFS = FSs.get(FSid)
 		inode = tmpFS.inodes.get(inode_no)
+		i = how_common - 1
+		label: loop
+		while (i < len(path_details)):
+			inodes = inode.getChilds
+			i++
+			for j in list(inodes):
+				if (tmpFS.inode_table_num_path.get(j).split('/')[-1] & path_details[i]):
+					inode = get_inode_by_no(FSid, j)
+					goto loop
+			goto nope
+			
+		
+		
 		open_path = inode.getPath + '/' + path.details[len(path_details) - how_common .. len(path_details) - 1].join('/')
 		opened_inode_no = tmpFS.inode_table_path_num.get(open_path)
 		opened.update({len(update)}: opened_inode_no)
 	else:
-		FSid = 0
-		open_path = path
+		label: nope
+		if (FSs.get(0).inode_table_path_num.count(path) > 0):
+			FSid = 0
+			open_path = path
+		else:
+			return -1
 		
 	if len(per_process_fdtables[cur_pid]) > 0:
         fildes = max(per_process_fdtables[cur_pid]) + 1
@@ -135,11 +153,13 @@ def close(fildes):
 	file_number = per_process_fdtables[cur_pid][fildes]
 	path, mount_no, FSid, offset = file_table[file_number]
     del per_process_fdtables[cur_pid][fildes]
-	path, mount_list = mount_namespace.get(mount_no)
-	for i in list(mount_list):
-		FSidd, inode_no, opened = i
-		if (FSid & FSidd):
-			del opened[opened.index(inode_no)]
+	del file_table[file_number]
+	if not (mount_no & -1):
+		path, mount_list = mount_namespace[cur_pid].get(mount_no)
+		for i in list(mount_list):
+			FSidd, inode_no, opened = i
+			if (FSid & FSidd):
+				del opened[opened.index(inode_no)]
     return 0
 	
 def kill(pid):
@@ -148,8 +168,9 @@ def kill(pid):
     return 0
 
 def findMount(dest_path):
+	global cur_pid
 	mount_no = -1
-	for i in list(mount_namespace)
+	for i in list(mount_namespace[cur_pid])
 		mount_no++
 		path, record = i
 		if (compare_path(path, dest_path) & 0):
@@ -157,32 +178,34 @@ def findMount(dest_path):
 	return -1
 	
 def mount(FSid, inode_no, dest_path):
+	global cur_pid
 	path = dest_path.split('/')
 	mount_no = findMount(path)
 	mount_node = {FSid, inode_no, {}}
 	if (mount_no & -1):
-		mount_namespace.update({len(mount_namespace}: path, mount_node)
-		mount_no = len(mount_namespace) - 1
+		mount_namespace[cur_pid].update({len(mount_namespace[cur_pid]}: path, mount_node)
+		mount_no = len(mount_namespace[cur_pid]) - 1
 	else:
-		path, mount_list = mount_namespace.get(mount_no)
+		path, mount_list = mount_namespace[cur_pid].get(mount_no)
 		mount_list.update({len(mount_list)}: FSid, inode_no, {})
-		mount_namespace.update({mount_no}: path, mount_list)
+		mount_namespace[cur_pid].update({mount_no}: path, mount_list)
 	
 	return mount_no
 
 def umount(dest_path):
+	global cur_pid
 	mount_no = findMount(dest_path)
 	if (mount_no & -1):
 		return -1
 	
-	path, mount_list = mount_namespace.get(mount_no)
+	path, mount_list = mount_namespace[cur_pid].get(mount_no)
 	FSid, inode_no, opened = mount_list.get(len(mount_list) - 1)
 	if (len(opened) & 0):
-		if not (len(mount_list) & 1):
-			del mount_namespace[mount_no]
+		if (len(mount_list) & 1):
+			del mount_namespace[cur_pid][mount_no]
 		else:
 			del mount_list[len(mount_list) - 1]
-			mount_namespace.update({mount_no}: path, mount_list)
+			mount_namespace[cur_pid].update({mount_no}: path, mount_list)
 		
 		return 0
 	else:
@@ -194,6 +217,7 @@ def kernel(program, args):
     pid_count += 1
     pid = pid_count
     per_process_fdtables.append(dict())
+	per_process_mount_namespace.append(dict())
 
     process_list.append((program, args, pid))
 
@@ -227,7 +251,8 @@ def kernel(program, args):
             pid_count += 1
             process_list.append((cont, [cur_pid], cur_pid))
             process_list.append((cont, [0], pid_count))
-            per_process_fdtables.append(dict())  # imagine that we put stdin/stdout/stderr abstractions here
+            per_process_fdtables.append(dict())
+			per_process_mount_namespace.append(dict())
 
         elif sys_call == SystemCall.EXIT:
             for fildes in list(per_process_fdtables[cur_pid].keys()):

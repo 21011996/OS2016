@@ -9,6 +9,9 @@ class SystemCall(Enum):
 	UMOUNT = "umount"
 	OPEN = "open"
 	CLOSE = "close"
+	CREATE = "create"
+	MKDIR = "mkdir"
+	UMASK = "umask"
 
 pid_count = 0
 cur_pid = -1
@@ -18,6 +21,12 @@ process_list = []
 per_process_fdtables = [dict()]
 
 per_process_mount_namespace = [dict()]
+
+per_process_mode_namespace = [dict()]
+'''
+per_process_mode_namespace[pid_id][fs_id][inode_no] = mode
+'''
+cur_umask = 0o0666
 
 '''
 mount_namespace = array of record
@@ -74,6 +83,17 @@ def FSdrv_get_root_inode(FSid):
 	global FSs
 	tmp_FS = FSs.get(FSid)
 	return get_inode_by_no(tmp_FS, 0)
+	
+def VFS_write_inode(int fs_id, int inode_no, INode * inode, mode);
+	global FSs
+	global cur_pid
+	tmp_FS = FSs.get(FSid)
+	if (FSs.inodes.get(inode_no) != null):
+		tmp_FS.update(inode_no, inode)
+	else:
+		tmp_FS.add(inode_no, inode)
+	per_process_mode_namespace[cur_pid][fs_id][inode_no] = mode
+	return inode_no
 	
 def compare_path(path1, path2):
 	iteration = 0
@@ -210,6 +230,37 @@ def umount(dest_path):
 		return 0
 	else:
 		return -2
+		
+def create(path, mode)
+	global cur_pid
+	global FSs
+	path_details = path.split('/')
+	parent_path = path_details[:-1].join('/')
+	parent_path, FSid_parent, inode_no_parent = resolve(parent_path)
+	tmp_FS = FSs.get(FSid_parent)
+	if (per_process_mode_namespace[cur_pid][FSid_parent][inode_no_parent] & 0x0022 & process_list):
+		inode = Inode()
+		inode.parent = tmp_FS.inode_table_path_num[parent_path]
+		inode.dir = False
+		VFS_write_inode(FSid_parent, len(tmp_FS.inodes), inode, mode)
+	else:
+		return -1
+		
+def mkdir(path, mode):
+	global cur_pid
+	global FSs
+	path_details = path.split('/')
+	parent_path = path_details[:-1].join('/')
+	parent_path, FSid_parent, inode_no_parent = resolve(parent_path)
+	tmp_FS = FSs.get(FSid_parent)
+	if (per_process_mode_namespace[cur_pid][FSid_parent][inode_no_parent] & 0x0022 & process_list):
+		inode = Inode()
+		inode.parent = tmp_FS.inode_table_path_num[parent_path]
+		inode.dir = True
+		VFS_write_inode(FSid_parent, len(tmp_FS.inodes), inode, mode)
+	else:
+		return -1
+	
 	
 def kernel(program, args):
     global pid_count
@@ -218,41 +269,54 @@ def kernel(program, args):
     pid = pid_count
     per_process_fdtables.append(dict())
 	per_process_mount_namespace.append(dict())
+	per_process_mode_namespace.append(dict())
 
-    process_list.append((program, args, pid))
+    process_list.append((program, args, pid, 0o0666))
 
     while len(process_list) > 0:
 
-        (next_process, next_args, next_pid) = process_list.pop()
+        (next_process, next_args, next_pid, umask) = process_list.pop()
         cur_pid = next_pid
         (sys_call, args, cont) = next_process(*next_args)
 
         elif sys_call == SystemCall.OPEN:
             open_result = open_fd(*args)
-            process_list.append((cont, [open_result], next_pid))
+            process_list.append((cont, [open_result], next_pid, umask))
 
         elif sys_call == SystemCall.CLOSE:
             close_result = close(args[0])
-            process_list.append((cont, [close_result], next_pid))
+            process_list.append((cont, [close_result], next_pid, umask))
 
         elif sys_call == SystemCall.MOUNT:
             mount_result = mount(*args)
-            process_list.append((cont, [mount_result], next_pid))
+            process_list.append((cont, [mount_result], next_pid, umask))
 
         elif sys_call == SystemCall.UMOUNT:
             umount_result = umount(args[0])
-            process_list.append((cont, [umount_result], next_pid))
+            process_list.append((cont, [umount_result], next_pid, umask))
+			
+		elif sys_call == SystemCall.CREATE:
+            create_result = create(*args)
+            process_list.append((cont, [create_result], next_pid, umask))
+ 
+        elif sys_call == SystemCall.MKDIR:
+            mkdir_result = mkdir(*args)
+            process_list.append((cont, [mkdir_result], next_pid, umask))
+			
+		elif sys_call == SystemCall.UMASK:
+            process_list.append((cont, [], next_pid, args[0]))
 
         elif sys_call == SystemCall.KILL:
             kill_result = kill(args[0])
-            process_list.append((cont, [kill_result], next_pid))
+            process_list.append((cont, [kill_result], next_pid, umask))
 
         elif sys_call == SystemCall.FORK:
             pid_count += 1
-            process_list.append((cont, [cur_pid], cur_pid))
-            process_list.append((cont, [0], pid_count))
+            process_list.append((cont, [cur_pid], cur_pid, umask))
+            process_list.append((cont, [0], pid_count, umask))
             per_process_fdtables.append(dict())
 			per_process_mount_namespace.append(dict())
+			per_process_mode_namespace.append(dict())
 
         elif sys_call == SystemCall.EXIT:
             for fildes in list(per_process_fdtables[cur_pid].keys()):

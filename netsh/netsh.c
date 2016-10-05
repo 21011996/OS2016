@@ -195,16 +195,16 @@ int main(int argc, char *argv[]) {
             return 0;
     }
 
-    pid_t deamon_pid = getpid();
-    char netsh_pid_file[420];
-    mkdir("tmp", S_IRWXU | S_IRWXG | S_IRWXO);
-    snprintf(netsh_pid_file, sizeof(netsh_pid_file), "tmp/netsh.pid");
-    FILE* f = fopen(netsh_pid_file, "w");
-    if (f < 0) {
-        print_err("Can't create file");
+    pid_t daemon_pid = getpid();
+    int tmp_fd = open("/tmp/netsh.pid", O_WRONLY | O_CREAT);
+    char* buf = new char[64];
+    int digits = sprintf(buf, "%d\n", daemon_pid);
+    ssize_t written_count = write(tmp_fd, buf, digits);
+    if (written_count == -1) {
+        close(tmp_fd);
+        print_err("Failed to write pid to file");
     }
-    fprintf(f,"%d", deamon_pid);
-    fclose(f);
+    close(tmp_fd);
     //Done pre part
 
     const int epoll_size = 32;
